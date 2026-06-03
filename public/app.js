@@ -51,7 +51,7 @@ function fillBalanceCard(scope, stats) {
   if (!card) return;
   const bal = card.querySelector('[data-balance]');
   bal.textContent = formatEuro(stats.balance);
-  bal.style.color = stats.balance >= 0 ? 'var(--income-bg)' : '#ffb4a2';
+  bal.style.color = '';
   card.querySelector('[data-income]').textContent = `+${formatEuro(stats.income)}`;
   card.querySelector('[data-expense]').textContent = `−${formatEuro(stats.expense)}`;
 }
@@ -209,7 +209,7 @@ async function loadHome() {
     api(`/api/transactions?month=${month}&limit=100`),
   ]);
 
-  $('#month-label').textContent = monthLabel(month);
+  $('#month-label').textContent = `Buchungen · ${monthLabel(month)}`;
   if (state.user?.name) $('#personal-balance-tag').textContent = state.user.name;
   fillBalanceCard('family', family);
   fillBalanceCard('personal', personal);

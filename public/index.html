@@ -59,37 +59,22 @@
 
       <!-- Home -->
       <div id="panel-home" class="panel active">
-        <p id="month-label" class="balance-month">Dieser Monat</p>
-        <div class="balance-stack">
-          <article class="balance-card balance-card--family" data-balance-card="family">
-            <span class="balance-tag">Haushalt</span>
-            <div class="balance-row">
-              <div>
-                <span class="mini-label">Saldo</span>
-                <span class="amount-lg" data-balance>—</span>
-              </div>
-              <div class="balance-split">
-                <span class="income-pill" data-income>+0 €</span>
-                <span class="expense-pill" data-expense>−0 €</span>
-              </div>
+        <article class="balance-panel" aria-label="Monatssalden">
+          <div class="balance-panel-grid">
+            <div class="balance-cell" data-balance-card="family">
+              <span class="balance-tag">Haushalt</span>
+              <span class="amount-md" data-balance>—</span>
+              <span class="balance-flow"><span data-income>+0 €</span><span data-expense>−0 €</span></span>
             </div>
-          </article>
-          <article class="balance-card balance-card--personal" data-balance-card="personal">
-            <span class="balance-tag" id="personal-balance-tag">Du</span>
-            <div class="balance-row">
-              <div>
-                <span class="mini-label">Saldo</span>
-                <span class="amount-lg" data-balance>—</span>
-              </div>
-              <div class="balance-split">
-                <span class="income-pill" data-income>+0 €</span>
-                <span class="expense-pill" data-expense>−0 €</span>
-              </div>
+            <div class="balance-cell balance-cell--personal" data-balance-card="personal">
+              <span class="balance-tag" id="personal-balance-tag">Du</span>
+              <span class="amount-md" data-balance>—</span>
+              <span class="balance-flow"><span data-income>+0 €</span><span data-expense>−0 €</span></span>
             </div>
-          </article>
-        </div>
+          </div>
+        </article>
         <div class="section-head">
-          <h3>Buchungen</h3>
+          <h3 id="month-label">Buchungen</h3>
           <input type="month" id="filter-month" class="month-picker" />
         </div>
         <ul id="tx-list" class="tx-list"></ul>
