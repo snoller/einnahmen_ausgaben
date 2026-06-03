@@ -59,18 +59,34 @@
 
       <!-- Home -->
       <div id="panel-home" class="panel active">
-        <div class="balance-card">
-          <span class="balance-label" id="month-label">Dieser Monat</span>
-          <div class="balance-row">
-            <div>
-              <span class="mini-label">Saldo</span>
-              <span id="balance-amount" class="amount-lg">—</span>
+        <p id="month-label" class="balance-month">Dieser Monat</p>
+        <div class="balance-stack">
+          <article class="balance-card balance-card--family" data-balance-card="family">
+            <span class="balance-tag">Haushalt</span>
+            <div class="balance-row">
+              <div>
+                <span class="mini-label">Saldo</span>
+                <span class="amount-lg" data-balance>—</span>
+              </div>
+              <div class="balance-split">
+                <span class="income-pill" data-income>+0 €</span>
+                <span class="expense-pill" data-expense>−0 €</span>
+              </div>
             </div>
-            <div class="balance-split">
-              <span class="income-pill" id="month-income">+0 €</span>
-              <span class="expense-pill" id="month-expense">−0 €</span>
+          </article>
+          <article class="balance-card balance-card--personal" data-balance-card="personal">
+            <span class="balance-tag" id="personal-balance-tag">Du</span>
+            <div class="balance-row">
+              <div>
+                <span class="mini-label">Saldo</span>
+                <span class="amount-lg" data-balance>—</span>
+              </div>
+              <div class="balance-split">
+                <span class="income-pill" data-income>+0 €</span>
+                <span class="expense-pill" data-expense>−0 €</span>
+              </div>
             </div>
-          </div>
+          </article>
         </div>
         <div class="section-head">
           <h3>Buchungen</h3>
@@ -82,6 +98,7 @@
 
       <!-- Stats -->
       <div id="panel-stats" class="panel">
+        <div id="stats-balance-summary" class="stats-balance-summary"></div>
         <div class="chart-block">
           <h3>Trend (6 Monate)</h3>
           <canvas id="chart-trend" height="140"></canvas>
@@ -101,9 +118,9 @@
         </div>
 
         <form id="tx-form" class="tx-form">
-          <div class="type-toggle">
-            <label><input type="radio" name="type" value="expense" checked /> Ausgabe</label>
-            <label><input type="radio" name="type" value="income" /> Einnahme</label>
+          <div class="type-toggle" role="group" aria-label="Buchungstyp">
+            <label><input type="radio" name="type" value="expense" checked /><span>Ausgabe</span></label>
+            <label><input type="radio" name="type" value="income" /><span>Einnahme</span></label>
           </div>
           <div class="field amount-field">
             <label for="tx-amount">Betrag (€)</label>

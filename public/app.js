@@ -42,6 +42,37 @@ function formatEuro(n) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
+function monthLabel(month) {
+  return new Date(month + '-01T12:00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+}
+
+function fillBalanceCard(scope, stats) {
+  const card = $(`[data-balance-card="${scope}"]`);
+  if (!card) return;
+  const bal = card.querySelector('[data-balance]');
+  bal.textContent = formatEuro(stats.balance);
+  bal.style.color = stats.balance >= 0 ? 'var(--income-bg)' : '#ffb4a2';
+  card.querySelector('[data-income]').textContent = `+${formatEuro(stats.income)}`;
+  card.querySelector('[data-expense]').textContent = `−${formatEuro(stats.expense)}`;
+}
+
+function renderStatsBalanceSummary(personal, family) {
+  const wrap = $('#stats-balance-summary');
+  const name = escapeHtml(state.user?.name || 'Du');
+  wrap.innerHTML = `
+    <div class="stats-balance-mini stats-balance-mini--family">
+      <span class="balance-tag">Haushalt</span>
+      <div class="amount-md">${formatEuro(family.balance)}</div>
+      <div class="tx-meta">+${formatEuro(family.income).replace('€', '').trim()} / −${formatEuro(family.expense).replace('€', '').trim()} €</div>
+    </div>
+    <div class="stats-balance-mini stats-balance-mini--personal">
+      <span class="balance-tag">${name}</span>
+      <div class="amount-md">${formatEuro(personal.balance)}</div>
+      <div class="tx-meta">+${formatEuro(personal.income).replace('€', '').trim()} / −${formatEuro(personal.expense).replace('€', '').trim()} €</div>
+    </div>
+  `;
+}
+
 function formatDate(iso) {
   return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
 }
@@ -93,6 +124,7 @@ async function boot() {
   }
   state.user = status.user;
   $('#user-name').textContent = status.user.name;
+  $('#personal-balance-tag').textContent = status.user.name;
   initApp();
   showScreen('app');
 }
@@ -111,6 +143,7 @@ async function loadUsers() {
       });
       state.user = user;
       $('#user-name').textContent = user.name;
+      $('#personal-balance-tag').textContent = user.name;
       initApp();
       showScreen('app');
     });
@@ -171,17 +204,15 @@ async function initApp() {
 
 async function loadHome() {
   const month = currentMonth();
-  const [stats, txs] = await Promise.all([
+  const [{ personal, family }, txs] = await Promise.all([
     api(`/api/stats/monthly?month=${month}`),
     api(`/api/transactions?month=${month}&limit=100`),
   ]);
 
-  const label = new Date(month + '-01T12:00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-  $('#month-label').textContent = label;
-  $('#balance-amount').textContent = formatEuro(stats.balance);
-  $('#balance-amount').style.color = stats.balance >= 0 ? 'var(--income-bg)' : '#ffb4a2';
-  $('#month-income').textContent = `+${formatEuro(stats.income)}`;
-  $('#month-expense').textContent = `−${formatEuro(stats.expense)}`;
+  $('#month-label').textContent = monthLabel(month);
+  if (state.user?.name) $('#personal-balance-tag').textContent = state.user.name;
+  fillBalanceCard('family', family);
+  fillBalanceCard('personal', personal);
 
   const list = $('#tx-list');
   const empty = $('#tx-empty');
@@ -523,12 +554,13 @@ function setAiStatus(msg) {
 
 async function drawStats() {
   const month = currentMonth();
-  const [trends, monthly] = await Promise.all([
+  const [trends, { personal, family }] = await Promise.all([
     api('/api/stats/trends?months=6'),
     api(`/api/stats/monthly?month=${month}`),
   ]);
+  renderStatsBalanceSummary(personal, family);
   drawTrendChart(trends);
-  drawCategoryBars(monthly.byCategory);
+  drawCategoryBars(personal.byCategory);
 }
 
 function drawTrendChart(rows) {

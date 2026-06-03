@@ -223,7 +223,10 @@ app.use('/uploads', requireAppAuth, express.static(uploadsDir));
 
 app.get('/api/stats/monthly', requireAppAuth, requireUser, (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7);
-  res.json(db.monthlyStats(req.user.id, month));
+  res.json({
+    personal: db.monthlyStats(req.user.id, month),
+    family: db.monthlyStatsFamily(month),
+  });
 });
 
 app.get('/api/stats/trends', requireAppAuth, requireUser, (req, res) => {
