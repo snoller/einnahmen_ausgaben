@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#1a2421" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Haushalt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Login -->
+    <section id="screen-login" class="screen active">
+      <div class="login-card">
+        <div class="logo-mark" aria-hidden="true">€</div>
+        <h1>Haushalt</h1>
+        <p class="subtitle">Privater Einnahmen & Ausgaben Tracker</p>
+        <form id="login-form">
+          <label for="app-password">App-Passwort</label>
+          <input type="password" id="app-password" autocomplete="current-password" required placeholder="••••••••" />
+          <button type="submit" class="btn btn-primary">Anmelden</button>
+        </form>
+        <p id="login-error" class="error hidden"></p>
+      </div>
+    </section>
+
+    <!-- User select -->
+    <section id="screen-users" class="screen">
+      <header class="screen-header">
+        <h2>Wer bist du?</h2>
+        <p class="subtitle">Profil wählen oder neu anlegen</p>
+      </header>
+      <ul id="user-list" class="user-list"></ul>
+      <form id="new-user-form" class="inline-form">
+        <input type="text" id="new-user-name" placeholder="Neuer Name" maxlength="40" required />
+        <button type="submit" class="btn btn-secondary">+</button>
+      </form>
+    </section>
+
+    <!-- Main app -->
+    <section id="screen-app" class="screen">
+      <header class="app-header">
+        <div>
+          <span class="greeting">Hallo,</span>
+          <strong id="user-name">—</strong>
+        </div>
+        <button type="button" id="btn-logout" class="btn-icon" title="Abmelden" aria-label="Abmelden">↩</button>
+      </header>
+
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="home" role="tab">Übersicht</button>
+        <button type="button" class="tab" data-tab="stats" role="tab">Analyse</button>
+        <button type="button" class="tab" data-tab="add" role="tab">+</button>
+      </nav>
+
+      <!-- Home -->
+      <div id="panel-home" class="panel active">
+        <div class="balance-card">
+          <span class="balance-label" id="month-label">Dieser Monat</span>
+          <div class="balance-row">
+            <div>
+              <span class="mini-label">Saldo</span>
+              <span id="balance-amount" class="amount-lg">—</span>
+            </div>
+            <div class="balance-split">
+              <span class="income-pill" id="month-income">+0 €</span>
+              <span class="expense-pill" id="month-expense">−0 €</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-head">
+          <h3>Buchungen</h3>
+          <input type="month" id="filter-month" class="month-picker" />
+        </div>
+        <ul id="tx-list" class="tx-list"></ul>
+        <p id="tx-empty" class="empty hidden">Noch keine Buchungen in diesem Monat.</p>
+      </div>
+
+      <!-- Stats -->
+      <div id="panel-stats" class="panel">
+        <div class="chart-block">
+          <h3>Trend (6 Monate)</h3>
+          <canvas id="chart-trend" height="140"></canvas>
+        </div>
+        <div class="chart-block">
+          <h3>Ausgaben nach Kategorie</h3>
+          <div id="category-bars" class="category-bars"></div>
+        </div>
+      </div>
+
+      <!-- Add -->
+      <div id="panel-add" class="panel">
+        <div class="add-modes">
+          <button type="button" class="mode-btn active" data-mode="manual">Manuell</button>
+          <button type="button" class="mode-btn" data-mode="voice">Sprache</button>
+          <button type="button" class="mode-btn" data-mode="receipt">Beleg</button>
+        </div>
+
+        <form id="tx-form" class="tx-form">
+          <div class="type-toggle">
+            <label><input type="radio" name="type" value="expense" checked /> Ausgabe</label>
+            <label><input type="radio" name="type" value="income" /> Einnahme</label>
+          </div>
+          <div class="field amount-field">
+            <label for="tx-amount">Betrag (€)</label>
+            <input type="number" id="tx-amount" step="0.01" min="0.01" required inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div class="field">
+            <label for="tx-category">Kategorie</label>
+            <select id="tx-category"></select>
+          </div>
+          <div class="field">
+            <label for="tx-description">Beschreibung</label>
+            <input type="text" id="tx-description" maxlength="200" placeholder="z.B. REWE, Gehalt…" />
+          </div>
+          <div class="field">
+            <label for="tx-date">Datum</label>
+            <input type="date" id="tx-date" required />
+          </div>
+          <input type="hidden" id="tx-source" value="manual" />
+          <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+        </form>
+
+        <div id="voice-panel" class="sub-panel hidden">
+          <p class="hint">Sag z.B. „15 Euro Kaffee beim Bäcker gestern“</p>
+          <p id="voice-hint-secure" class="hint hint-warn hidden"></p>
+          <button type="button" id="btn-voice-record" class="btn btn-voice btn-block">
+            <span class="mic-icon">🎙</span>
+            <span id="record-label">Aufnahme starten (empfohlen)</span>
+          </button>
+          <button type="button" id="btn-voice" class="btn btn-secondary btn-block">
+            <span id="voice-label">Browser-Sprache (Chrome)</span>
+          </button>
+          <textarea id="voice-text" rows="3" placeholder="Transkript oder Text eingeben…"></textarea>
+          <button type="button" id="btn-parse-voice" class="btn btn-secondary btn-block">Mit KI auswerten</button>
+        </div>
+
+        <div id="receipt-panel" class="sub-panel hidden">
+          <p class="hint">Beleg fotografieren – KI füllt Felder vor</p>
+          <label class="receipt-upload">
+            <input type="file" id="receipt-input" accept="image/*" capture="environment" />
+            <span id="receipt-preview-wrap" class="receipt-preview hidden">
+              <img id="receipt-preview" alt="Belegvorschau" />
+            </span>
+            <span class="upload-label">📷 Beleg aufnehmen</span>
+          </label>
+          <button type="button" id="btn-parse-receipt" class="btn btn-secondary btn-block" disabled>Beleg auslesen</button>
+        </div>
+
+        <p id="ai-status" class="ai-status hidden"></p>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
