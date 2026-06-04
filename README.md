@@ -35,7 +35,8 @@ npm start
 | `APP_PASSWORD` | Zugangspasswort für die App |
 | `SESSION_SECRET` | Langer Zufallsstring für signierte Cookies |
 | `GEMINI_API_KEY` | Google Gemini API Key |
-| `GEMINI_MODEL` | Standard: `gemini-3.5-flash` |
+| `GEMINI_MODEL` | Standard: `gemini-3.5-flash` (mit `thinkingLevel: minimal` für Speed) |
+| `GEMINI_AUDIO_MODEL` | Optional schnelleres Modell nur für Sprach-Aufnahmen |
 | `PORT` | Standard in `.env.example`: `3847` |
 
 ## Nutzung

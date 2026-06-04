@@ -463,9 +463,21 @@ function setupVoiceRecording() {
         return;
       }
 
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: { ideal: 16000 },
+        },
+      });
       chunks = [];
-      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const recorderOpts = { mimeType, audioBitsPerSecond: 24000 };
+      try {
+        mediaRecorder = new MediaRecorder(stream, recorderOpts);
+      } catch {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      }
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
