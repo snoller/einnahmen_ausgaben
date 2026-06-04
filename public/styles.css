@@ -553,9 +553,165 @@ textarea:focus {
   margin: 0.5rem 0;
 }
 
-.btn-voice.recording,
 .btn-voice.listening {
   animation: pulse 1s infinite;
+}
+
+/* Audio recorder */
+.recorder {
+  margin: 0.75rem 0 1rem;
+}
+
+.recorder-state.hidden {
+  display: none;
+}
+
+.recorder-start,
+.recorder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 0.65rem;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #b91c1c, var(--expense));
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(155, 34, 38, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.recorder-btn:active {
+  transform: scale(0.96);
+}
+
+.recorder-btn.recording {
+  background: linear-gradient(145deg, #1a2421, #2d3a35);
+  box-shadow: 0 0 0 4px rgba(155, 34, 38, 0.35), 0 8px 24px rgba(26, 36, 33, 0.25);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.recorder-meter {
+  margin-top: 0.75rem;
+}
+
+.recorder-meter.hidden {
+  display: none;
+}
+
+.recorder-mic-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.recorder-cta {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.recorder-sub {
+  margin: 0.25rem 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.recorder-live {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--expense);
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--expense);
+  animation: recBlink 1s ease-in-out infinite;
+}
+
+@keyframes recBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.record-timer {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.record-max {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.waveform-wrap {
+  background: var(--ink);
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.65rem;
+  min-height: 56px;
+}
+
+.waveform-canvas {
+  display: block;
+  width: 100%;
+  height: 56px;
+}
+
+.recorder-hint-active,
+.recorder-stop,
+.btn-text,
+.voice-advanced {
+  display: none;
+}
+
+.recorder-processing-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 0;
+}
+
+.recorder-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.recorder-processing-text {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.voice-advanced summary {
+  display: none;
+}
+
+.voice-advanced[open] summary {
+  margin-bottom: 0.5rem;
 }
 
 .hint-warn {

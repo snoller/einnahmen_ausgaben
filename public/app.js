@@ -306,203 +306,199 @@ function setupAddModes() {
 
 // --- Voice ---
 
-const SPEECH_ERRORS = {
-  'not-allowed': 'Mikrofon blockiert – in den Browser-Einstellungen erlauben.',
-  'service-not-allowed': 'Browser-Sprache nur mit https:// oder localhost (nicht per IP).',
-  network: 'Netzwerk nötig – Chrome nutzt Google-Server für die Spracherkennung.',
-  'no-speech': 'Nichts gehört – bitte erneut und deutlicher sprechen.',
-  'audio-capture': 'Kein Mikrofon gefunden.',
-  aborted: null,
-};
-
-async function ensureMicrophone() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('Mikrofon wird von diesem Browser nicht unterstützt');
-  }
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  stream.getTracks().forEach((t) => t.stop());
-}
-
 function pickAudioMimeType() {
   const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
   if (!window.MediaRecorder) return null;
   return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
 }
 
-function setupVoice() {
-  const secureHint = $('#voice-hint-secure');
-  if (!window.isSecureContext) {
-    secureHint.textContent = 'Ohne HTTPS funktioniert die Browser-Sprache oft nicht – nutze „Aufnahme starten“.';
-    secureHint.classList.remove('hidden');
+function createWaveform(canvas, stream) {
+  const ctx = canvas.getContext('2d');
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 128;
+  analyser.smoothingTimeConstant = 0.82;
+  const source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+  const buffer = new Uint8Array(analyser.frequencyBinCount);
+  let raf = null;
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 280;
+    const h = 56;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    analyser.getByteFrequencyData(buffer);
+
+    ctx.clearRect(0, 0, w, h);
+    const bars = 36;
+    const gap = 2;
+    const barW = Math.max(2, (w - gap * (bars - 1)) / bars);
+
+    for (let i = 0; i < bars; i += 1) {
+      const idx = Math.floor((i / bars) * buffer.length);
+      const v = buffer[idx] / 255;
+      const barH = Math.max(3, v * h * 0.88);
+      const x = i * (barW + gap);
+      const y = (h - barH) / 2;
+      ctx.fillStyle = v > 0.12 ? `rgba(255, 180, 162, ${0.45 + v * 0.55})` : 'rgba(255,255,255,0.12)';
+      ctx.fillRect(x, y, barW, barH);
+    }
+    raf = requestAnimationFrame(draw);
   }
 
-  setupVoiceRecording();
-  setupBrowserSpeech();
+  return {
+    start() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      draw();
+    },
+    stop() {
+      if (raf) cancelAnimationFrame(raf);
+      source.disconnect();
+      audioCtx.close().catch(() => {});
+    },
+  };
+}
 
-  $('#btn-parse-voice').addEventListener('click', async () => {
-    const text = $('#voice-text').value.trim();
-    if (!text) return toast('Bitte sprechen, aufnehmen oder Text eingeben');
-    setAiStatus('KI wertet aus…');
+function setupVoice() {
+  setupVoiceRecording();
+}
+
+function setupVoiceRecording() {
+  const ui = $('#recorder-ui');
+  const processing = $('#recorder-processing');
+  const btn = $('#btn-voice-record');
+  const btnIcon = $('#recorder-btn-icon');
+  const hint = $('#recorder-hint');
+  const sub = $('#recorder-sub');
+  const meter = $('#recorder-meter');
+  const timerEl = $('#record-timer');
+  const canvas = $('#waveform-canvas');
+
+  let mediaRecorder = null;
+  let stream = null;
+  let waveform = null;
+  let chunks = [];
+  let mimeType = '';
+  let timerInterval = null;
+  let maxTimer = null;
+  let startTime = 0;
+  let isRecording = false;
+
+  function setRecordingUI(active) {
+    isRecording = active;
+    btn.classList.toggle('recording', active);
+    btn.setAttribute('aria-label', active ? 'Aufnahme beenden' : 'Aufnahme starten');
+    btnIcon.textContent = active ? '⏹' : '🎙';
+    hint.textContent = active ? 'Erneut tippen zum Beenden' : 'Tippen zum Aufnehmen';
+    sub.textContent = active
+      ? 'Sprich jetzt deine Buchung …'
+      : 'Max. 15 Sek. · erneut tippen zum Beenden';
+    meter.classList.toggle('hidden', !active);
+  }
+
+  function showProcessing(active) {
+    ui.classList.toggle('hidden', active);
+    processing.classList.toggle('hidden', !active);
+    btn.disabled = active;
+  }
+
+  function clearTimers() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (maxTimer) clearTimeout(maxTimer);
+    timerInterval = null;
+    maxTimer = null;
+  }
+
+  function updateTimer() {
+    const sec = Math.floor((Date.now() - startTime) / 1000);
+    timerEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  }
+
+  function releaseMedia() {
+    clearTimers();
+    waveform?.stop();
+    waveform = null;
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+  }
+
+  async function processBlob(blob) {
+    if (blob.size < 500) {
+      toast('Aufnahme zu kurz – bitte etwas länger sprechen');
+      setRecordingUI(false);
+      timerEl.textContent = '0:00';
+      return;
+    }
+
+    showProcessing(true);
+    const fd = new FormData();
+    fd.append('audio', blob, `voice.${mimeType.includes('mp4') ? 'm4a' : 'webm'}`);
     try {
-      const parsed = await api('/api/ai/parse-text', { method: 'POST', body: { text } });
+      const parsed = await api('/api/ai/parse-audio', { method: 'POST', body: fd });
       fillFormFromParsed(parsed);
       $$('.mode-btn').find((b) => b.dataset.mode === 'manual')?.click();
       $('#tx-form').classList.remove('hidden');
     } catch (ex) {
       toast(ex.message);
     } finally {
-      setAiStatus('');
+      showProcessing(false);
+      setRecordingUI(false);
+      timerEl.textContent = '0:00';
     }
-  });
-}
+  }
 
-function setupVoiceRecording() {
-  const btn = $('#btn-voice-record');
-  const label = $('#record-label');
-  let mediaRecorder = null;
-  let chunks = [];
-  let mimeType = '';
+  function stopRecording() {
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  }
 
-  btn.addEventListener('click', async () => {
-    if (mediaRecorder?.state === 'recording') {
-      mediaRecorder.stop();
-      return;
-    }
-
+  async function startRecording() {
     try {
-      await ensureMicrophone();
-    } catch (ex) {
-      toast(ex.message);
-      return;
-    }
+      mimeType = pickAudioMimeType();
+      if (!mimeType) {
+        toast('Audio-Aufnahme wird von diesem Browser nicht unterstützt');
+        return;
+      }
 
-    mimeType = pickAudioMimeType();
-    if (!mimeType) {
-      toast('Audio-Aufnahme wird von diesem Browser nicht unterstützt');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks = [];
       mediaRecorder = new MediaRecorder(stream, { mimeType });
+
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
+
       mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        btn.classList.remove('recording');
-        label.textContent = 'Aufnahme starten (empfohlen)';
-
         const blob = new Blob(chunks, { type: mimeType });
-        if (blob.size < 500) {
-          toast('Aufnahme zu kurz – bitte erneut sprechen');
-          return;
-        }
-
-        setAiStatus('Gemini hört zu…');
-        const fd = new FormData();
-        fd.append('audio', blob, `voice.${mimeType.includes('mp4') ? 'm4a' : 'webm'}`);
-        try {
-          const parsed = await api('/api/ai/parse-audio', { method: 'POST', body: fd });
-          if (parsed.description) {
-            $('#voice-text').value = parsed.description;
-          }
-          fillFormFromParsed(parsed);
-          $$('.mode-btn').find((b) => b.dataset.mode === 'manual')?.click();
-          $('#tx-form').classList.remove('hidden');
-        } catch (ex) {
-          toast(ex.message);
-        } finally {
-          setAiStatus('');
-        }
+        releaseMedia();
+        mediaRecorder = null;
+        setRecordingUI(false);
+        await processBlob(blob);
       };
-      mediaRecorder.start();
-      btn.classList.add('recording');
-      label.textContent = 'Stoppen & auswerten…';
-      setTimeout(() => {
-        if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
-      }, 15000);
+
+      mediaRecorder.start(250);
+      startTime = Date.now();
+      timerEl.textContent = '0:00';
+      setRecordingUI(true);
+      timerInterval = setInterval(updateTimer, 200);
+      waveform = createWaveform(canvas, stream);
+      waveform.start();
+      maxTimer = setTimeout(stopRecording, 15000);
     } catch (ex) {
-      toast(ex.message || 'Aufnahme fehlgeschlagen');
+      releaseMedia();
+      mediaRecorder = null;
+      setRecordingUI(false);
+      toast(ex.message || 'Mikrofon-Zugriff fehlgeschlagen');
     }
-  });
-}
-
-function setupBrowserSpeech() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn = $('#btn-voice');
-  const label = $('#voice-label');
-
-  if (!SpeechRecognition) {
-    label.textContent = 'Browser-Sprache nicht verfügbar (Firefox)';
-    btn.disabled = true;
-    return;
   }
 
-  const rec = new SpeechRecognition();
-  rec.lang = 'de-DE';
-  rec.interimResults = true;
-  rec.continuous = false;
-  rec.maxAlternatives = 1;
-  let active = false;
-
-  rec.onresult = (ev) => {
-    let text = '';
-    for (const r of ev.results) text += r[0].transcript;
-    $('#voice-text').value = text.trim();
-  };
-
-  rec.onend = () => {
-    active = false;
-    btn.classList.remove('listening');
-    label.textContent = 'Browser-Sprache (Chrome)';
-  };
-
-  rec.onerror = (ev) => {
-    active = false;
-    btn.classList.remove('listening');
-    label.textContent = 'Browser-Sprache (Chrome)';
-    const msg = SPEECH_ERRORS[ev.error];
-    if (msg) toast(msg);
-  };
-
-  btn.addEventListener('click', async () => {
-    if (active) {
-      rec.stop();
-      return;
-    }
-
-    if (!window.isSecureContext) {
-      toast('Browser-Sprache braucht localhost oder HTTPS – nutze „Aufnahme starten“.');
-      return;
-    }
-
-    try {
-      await ensureMicrophone();
-    } catch (ex) {
-      toast(ex.message);
-      return;
-    }
-
-    try {
-      rec.start();
-      active = true;
-      btn.classList.add('listening');
-      label.textContent = 'Hört zu… (nochmal tippen = Stopp)';
-    } catch {
-      rec.stop();
-      setTimeout(() => {
-        try {
-          rec.start();
-          active = true;
-          btn.classList.add('listening');
-          label.textContent = 'Hört zu…';
-        } catch {
-          toast('Spracherkennung konnte nicht gestartet werden');
-        }
-      }, 300);
-    }
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    if (isRecording) stopRecording();
+    else startRecording();
   });
 }
 

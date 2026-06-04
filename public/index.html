@@ -129,16 +129,34 @@
 
         <div id="voice-panel" class="sub-panel hidden">
           <p class="hint">Sag z.B. „15 Euro Kaffee beim Bäcker gestern“</p>
-          <p id="voice-hint-secure" class="hint hint-warn hidden"></p>
-          <button type="button" id="btn-voice-record" class="btn btn-voice btn-block">
-            <span class="mic-icon">🎙</span>
-            <span id="record-label">Aufnahme starten (empfohlen)</span>
-          </button>
-          <button type="button" id="btn-voice" class="btn btn-secondary btn-block">
-            <span id="voice-label">Browser-Sprache (Chrome)</span>
-          </button>
-          <textarea id="voice-text" rows="3" placeholder="Transkript oder Text eingeben…"></textarea>
-          <button type="button" id="btn-parse-voice" class="btn btn-secondary btn-block">Mit KI auswerten</button>
+
+          <div class="recorder" id="audio-recorder">
+            <div id="recorder-ui" class="recorder-state">
+              <button type="button" id="btn-voice-record" class="recorder-btn" aria-label="Aufnahme starten">
+                <span class="recorder-mic-icon" id="recorder-btn-icon" aria-hidden="true">🎙</span>
+              </button>
+              <p id="recorder-hint" class="recorder-cta">Tippen zum Aufnehmen</p>
+              <p id="recorder-sub" class="recorder-sub">Max. 15 Sek. · erneut tippen zum Beenden</p>
+              <div id="recorder-meter" class="recorder-meter hidden">
+                <div class="recorder-live">
+                  <span class="rec-dot" aria-hidden="true"></span>
+                  <span class="recorder-live-label">Aufnahme läuft</span>
+                  <span id="record-timer" class="record-timer">0:00</span>
+                  <span class="record-max">/ 0:15</span>
+                </div>
+                <div class="waveform-wrap">
+                  <canvas id="waveform-canvas" class="waveform-canvas" aria-hidden="true"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div id="recorder-processing" class="recorder-state hidden">
+              <div class="recorder-processing-inner">
+                <div class="recorder-spinner" aria-hidden="true"></div>
+                <p class="recorder-processing-text">Gemini hört zu …</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div id="receipt-panel" class="sub-panel hidden">
