@@ -4,6 +4,8 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const state = {
   user: null,
   editingId: null,
+  statsScope: 'personal',
+  statsCache: null,
   receiptFile: null,
   receiptPath: null,
 };
@@ -57,19 +59,14 @@ function fillBalanceCard(scope, stats) {
   card.querySelector('[data-expense]').textContent = `−${formatEuro(stats.expense)}`;
 }
 
-function renderStatsBalanceSummary(personal, family) {
+function renderStatsBalanceSummary(stats, scope) {
   const wrap = $('#stats-balance-summary');
-  const name = escapeHtml(state.user?.name || 'Du');
+  const label = scope === 'family' ? 'Haushalt' : escapeHtml(state.user?.name || 'Du');
   wrap.innerHTML = `
-    <div class="stats-balance-mini stats-balance-mini--family">
-      <span class="balance-tag">Haushalt</span>
-      <div class="amount-md">${formatEuro(family.balance)}</div>
-      <div class="tx-meta">+${formatEuro(family.income).replace('€', '').trim()} / −${formatEuro(family.expense).replace('€', '').trim()} €</div>
-    </div>
-    <div class="stats-balance-mini stats-balance-mini--personal">
-      <span class="balance-tag">${name}</span>
-      <div class="amount-md">${formatEuro(personal.balance)}</div>
-      <div class="tx-meta">+${formatEuro(personal.income).replace('€', '').trim()} / −${formatEuro(personal.expense).replace('€', '').trim()} €</div>
+    <div class="stats-balance-mini stats-balance-mini--${scope}">
+      <span class="balance-tag">${label}</span>
+      <div class="amount-md">${formatEuro(stats.balance)}</div>
+      <div class="tx-meta">+${formatEuro(stats.income).replace('€', '').trim()} / −${formatEuro(stats.expense).replace('€', '').trim()} €</div>
     </div>
   `;
 }
@@ -79,7 +76,19 @@ function formatDate(iso) {
 }
 
 function currentMonth() {
-  return $('#filter-month')?.value || new Date().toISOString().slice(0, 7);
+  const statsMonth = $('#stats-month');
+  const homeMonth = $('#filter-month');
+  if ($('#panel-stats')?.classList.contains('active') && statsMonth?.value) {
+    return statsMonth.value;
+  }
+  return homeMonth?.value || new Date().toISOString().slice(0, 7);
+}
+
+function syncMonthPickers(value) {
+  const v = value || new Date().toISOString().slice(0, 7);
+  if ($('#filter-month')) $('#filter-month').value = v;
+  if ($('#stats-month')) $('#stats-month').value = v;
+  state.statsCache = null;
 }
 
 function categoryIcon(cat) {
@@ -199,9 +208,19 @@ function setAddMode(mode) {
 // --- Categories & form ---
 
 async function initApp() {
-  const monthInput = $('#filter-month');
-  monthInput.value = new Date().toISOString().slice(0, 7);
-  monthInput.addEventListener('change', loadHome);
+  const month = new Date().toISOString().slice(0, 7);
+  syncMonthPickers(month);
+  $('#filter-month').addEventListener('change', (e) => {
+    syncMonthPickers(e.target.value);
+    loadHome();
+  });
+  $('#stats-month').addEventListener('change', (e) => {
+    syncMonthPickers(e.target.value);
+    if ($('#panel-stats').classList.contains('active')) drawStats();
+    else loadHome();
+  });
+
+  setupStatsScope();
 
   const cats = await api('/api/categories');
   const sel = $('#tx-category');
@@ -263,6 +282,7 @@ async function loadHome() {
       if (!confirm('Buchung löschen?')) return;
       await api(`/api/transactions/${btn.dataset.id}`, { method: 'DELETE' });
       toast('Gelöscht');
+      state.statsCache = null;
       loadHome();
     });
   });
@@ -296,6 +316,7 @@ async function onSaveTx(e) {
       $('#btn-parse-receipt').disabled = true;
     }
     resetTxForm();
+    state.statsCache = null;
     $$('.tab').find((t) => t.dataset.tab === 'home')?.click();
     loadHome();
   } catch (ex) {
@@ -628,72 +649,100 @@ function setAiStatus(msg) {
 
 // --- Charts ---
 
+function setupStatsScope() {
+  $$('.stats-scope-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.statsScope = btn.dataset.scope;
+      $$('.stats-scope-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      drawStats();
+    });
+  });
+}
+
+function statsMonthlyBlock(data) {
+  return state.statsScope === 'family' ? data.family : data.personal;
+}
+
+function statsTrendRows(data) {
+  return state.statsScope === 'family' ? data.family : data.personal;
+}
+
 async function drawStats() {
   const month = currentMonth();
-  const [trends, { personal, family }] = await Promise.all([
-    api('/api/stats/trends?months=6'),
-    api(`/api/stats/monthly?month=${month}`),
-  ]);
-  renderStatsBalanceSummary(personal, family);
-  drawTrendChart(trends);
-  drawCategoryBars(personal.byCategory);
+  if (!state.statsCache || state.statsCache.month !== month) {
+    const [trends, monthly] = await Promise.all([
+      api('/api/stats/trends?months=6'),
+      api(`/api/stats/monthly?month=${month}`),
+    ]);
+    state.statsCache = { month, trends, monthly };
+  }
+
+  const { trends, monthly } = state.statsCache;
+  const scopeStats = statsMonthlyBlock(monthly);
+  renderStatsBalanceSummary(scopeStats, state.statsScope);
+  drawTrendChart(statsTrendRows(trends));
+  drawCategoryBars(scopeStats.byCategory);
 }
 
 function drawTrendChart(rows) {
   const canvas = $('#chart-trend');
+  const block = canvas.parentElement;
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth - 8;
+  const w = block.clientWidth;
   const h = 140;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
+  canvas.width = Math.max(1, Math.floor(w * dpr));
+  canvas.height = Math.floor(h * dpr);
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const months = [...new Set(rows.map((r) => r.month))].sort();
   if (!months.length) {
     ctx.fillStyle = '#6b7c77';
     ctx.font = '13px Plus Jakarta Sans, sans-serif';
+    ctx.textAlign = 'left';
     ctx.fillText('Noch keine Daten', 12, h / 2);
     return;
   }
 
   const incomeByMonth = Object.fromEntries(rows.filter((r) => r.type === 'income').map((r) => [r.month, r.total]));
   const expenseByMonth = Object.fromEntries(rows.filter((r) => r.type === 'expense').map((r) => [r.month, r.total]));
-  const max = Math.max(...months.map((m) => (incomeByMonth[m] || 0) + (expenseByMonth[m] || 0)), 1);
+  const max = Math.max(...months.map((m) => Math.max(incomeByMonth[m] || 0, expenseByMonth[m] || 0)), 1);
 
-  const pad = { l: 8, r: 8, t: 12, b: 28 };
+  const pad = { l: 4, r: 4, t: 18, b: 24 };
   const chartW = w - pad.l - pad.r;
   const chartH = h - pad.t - pad.b;
-  const barW = chartW / months.length * 0.55;
-  const gap = chartW / months.length;
+  const slotW = chartW / months.length;
+  const barW = Math.max(4, slotW * 0.52);
 
   months.forEach((m, i) => {
-    const x = pad.l + i * gap + (gap - barW) / 2;
+    const slotCenter = pad.l + slotW * i + slotW / 2;
+    const x = slotCenter - barW / 2;
     const exp = expenseByMonth[m] || 0;
     const inc = incomeByMonth[m] || 0;
     const expH = (exp / max) * chartH;
     const incH = (inc / max) * chartH;
     const baseY = pad.t + chartH;
+    const half = barW / 2 - 1;
 
     ctx.fillStyle = '#b84a3a';
-    ctx.fillRect(x, baseY - expH, barW / 2 - 1, expH);
+    ctx.fillRect(x, baseY - expH, half, expH);
     ctx.fillStyle = '#2f6b57';
-    ctx.fillRect(x + barW / 2 + 1, baseY - incH, barW / 2 - 1, incH);
+    ctx.fillRect(x + half + 2, baseY - incH, half, incH);
 
     ctx.fillStyle = '#6b7c77';
     ctx.font = '10px Plus Jakarta Sans, sans-serif';
     ctx.textAlign = 'center';
-    const label = m.slice(5);
-    ctx.fillText(label, x + barW / 2, h - 6);
+    ctx.fillText(m.slice(5), slotCenter, h - 8);
   });
 
+  ctx.textAlign = 'left';
   ctx.font = '10px Plus Jakarta Sans, sans-serif';
   ctx.fillStyle = '#b84a3a';
-  ctx.fillText('Ausgaben', pad.l, 10);
+  ctx.fillText('Ausgaben', pad.l, 11);
   ctx.fillStyle = '#2f6b57';
-  ctx.fillText('Einnahmen', pad.l + 58, 10);
+  ctx.fillText('Einnahmen', pad.l + 58, 11);
 }
 
 function drawCategoryBars(categories) {
@@ -705,11 +754,13 @@ function drawCategoryBars(categories) {
   const max = Math.max(...categories.map((c) => c.total));
   wrap.innerHTML = categories.map((c) => `
     <div class="cat-row">
-      <span>${escapeHtml(c.category || 'Sonstiges')}</span>
+      <div class="cat-row-head">
+        <span class="cat-label">${escapeHtml(c.category || 'Sonstiges')}</span>
+        <span class="cat-amount">${formatEuro(c.total)}</span>
+      </div>
       <div class="cat-bar-wrap">
         <div class="cat-bar" style="width:${(c.total / max) * 100}%"></div>
       </div>
-      <span class="cat-amount">${formatEuro(c.total)}</span>
     </div>
   `).join('');
 }

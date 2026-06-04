@@ -249,7 +249,10 @@ app.get('/api/stats/monthly', requireAppAuth, requireUser, (req, res) => {
 
 app.get('/api/stats/trends', requireAppAuth, requireUser, (req, res) => {
   const months = Number(req.query.months) || 6;
-  res.json(db.trendStats(req.user.id, months));
+  res.json({
+    personal: db.trendStats(req.user.id, months),
+    family: db.trendStatsFamily(months),
+  });
 });
 
 app.get('/api/categories', requireAppAuth, (_req, res) => {
