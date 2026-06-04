@@ -457,10 +457,55 @@ textarea:focus {
 .stats-control {
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.stats-toolbar .stats-control {
   font-size: 0.82rem;
   padding: 0.45rem 0.55rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  background-color: var(--surface);
+}
+
+.stats-toolbar select.stats-control {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 1.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath stroke='%236b7c77' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+}
+
+.stats-toolbar input[type="month"].stats-control {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.stats-toolbar input[type="month"].stats-control::-webkit-datetime-edit,
+.stats-toolbar input[type="month"].stats-control::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+.stats-toolbar input[type="month"].stats-control::-webkit-calendar-picker-indicator {
+  margin: 0;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.stats-control:focus {
+  outline: none;
+  border-color: var(--ink-soft);
+  box-shadow: 0 0 0 3px rgba(47, 69, 65, 0.12);
 }
 
 .stats-balance-summary {
