@@ -3,6 +3,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const state = {
   user: null,
+  editingId: null,
   receiptFile: null,
   receiptPath: null,
 };
@@ -178,8 +179,22 @@ $$('.tab').forEach((tab) => {
     $(`#panel-${name}`)?.classList.add('active');
     if (name === 'stats') drawStats();
     if (name === 'home') loadHome();
+    if (name === 'add') {
+      if (state.editingId) setAddMode('manual');
+      else {
+        resetTxForm();
+        setAddMode('voice');
+      }
+    }
   });
 });
+
+function setAddMode(mode) {
+  $$('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+  $('#tx-form').classList.toggle('hidden', mode !== 'manual');
+  $('#voice-panel').classList.toggle('hidden', mode !== 'voice');
+  $('#receipt-panel').classList.toggle('hidden', mode !== 'receipt');
+}
 
 // --- Categories & form ---
 
@@ -223,16 +238,25 @@ async function loadHome() {
   }
   empty.classList.add('hidden');
   list.innerHTML = txs.map((tx) => `
-    <li class="tx-item ${tx.type}">
-      <span class="tx-icon">${categoryIcon(tx.category)}</span>
-      <div class="tx-main">
-        <div class="tx-title">${escapeHtml(tx.description || tx.category || 'Buchung')}</div>
-        <div class="tx-meta">${formatDate(tx.date)} · ${escapeHtml(tx.category || '—')}${tx.source === 'ai' ? ' · KI' : ''}</div>
-      </div>
-      <span class="tx-amount">${tx.type === 'income' ? '+' : '−'}${formatEuro(tx.amount).replace('€', '').trim()} €</span>
+    <li class="tx-item ${tx.type}" data-id="${tx.id}">
+      <button type="button" class="tx-open" data-id="${tx.id}" aria-label="Buchung bearbeiten">
+        <span class="tx-icon">${categoryIcon(tx.category)}</span>
+        <span class="tx-main">
+          <span class="tx-title">${escapeHtml(tx.description || tx.category || 'Buchung')}</span>
+          <span class="tx-meta">${formatDate(tx.date)} · ${escapeHtml(tx.category || '—')}${tx.source === 'ai' ? ' · KI' : ''}</span>
+        </span>
+        <span class="tx-amount">${tx.type === 'income' ? '+' : '−'}${formatEuro(tx.amount).replace('€', '').trim()} €</span>
+      </button>
       <button type="button" class="tx-delete" data-id="${tx.id}" aria-label="Löschen">×</button>
     </li>
   `).join('');
+
+  list.querySelectorAll('.tx-open').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tx = txs.find((t) => String(t.id) === btn.dataset.id);
+      if (tx) openEditTx(tx);
+    });
+  });
 
   list.querySelectorAll('.tx-delete').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -247,31 +271,69 @@ async function loadHome() {
 async function onSaveTx(e) {
   e.preventDefault();
   const type = $('input[name="type"]:checked').value;
+  const body = {
+    type,
+    amount: Number($('#tx-amount').value),
+    category: $('#tx-category').value,
+    description: $('#tx-description').value,
+    date: $('#tx-date').value,
+  };
   try {
-    await api('/api/transactions', {
-      method: 'POST',
-      body: {
-        type,
-        amount: Number($('#tx-amount').value),
-        category: $('#tx-category').value,
-        description: $('#tx-description').value,
-        date: $('#tx-date').value,
-        source: $('#tx-source').value,
-      },
-    });
-    toast('Gespeichert');
-    $('#tx-amount').value = '';
-    $('#tx-description').value = '';
-    state.receiptFile = null;
-    state.receiptPath = null;
-    $('#receipt-preview-wrap').classList.add('hidden');
-    $('#btn-parse-receipt').disabled = true;
+    if (state.editingId) {
+      await api(`/api/transactions/${state.editingId}`, { method: 'PUT', body });
+      toast('Aktualisiert');
+    } else {
+      await api('/api/transactions', {
+        method: 'POST',
+        body: { ...body, source: $('#tx-source').value },
+      });
+      toast('Gespeichert');
+      $('#tx-amount').value = '';
+      $('#tx-description').value = '';
+      state.receiptFile = null;
+      state.receiptPath = null;
+      $('#receipt-preview-wrap').classList.add('hidden');
+      $('#btn-parse-receipt').disabled = true;
+    }
+    resetTxForm();
     $$('.tab').find((t) => t.dataset.tab === 'home')?.click();
     loadHome();
   } catch (ex) {
     toast(ex.message);
   }
 }
+
+function resetTxForm() {
+  state.editingId = null;
+  $('#tx-form-title').classList.add('hidden');
+  $('#tx-cancel-edit').classList.add('hidden');
+  $('#tx-submit-btn').textContent = 'Speichern';
+  $('#tx-source').value = 'manual';
+}
+
+function openEditTx(tx) {
+  state.editingId = tx.id;
+  $(`input[name="type"][value="${tx.type}"]`).checked = true;
+  $('#tx-amount').value = tx.amount;
+  const catSel = $('#tx-category');
+  if ([...catSel.options].some((o) => o.value === tx.category)) {
+    catSel.value = tx.category;
+  } else {
+    catSel.value = 'Sonstiges';
+  }
+  $('#tx-description').value = tx.description || '';
+  $('#tx-date').value = tx.date;
+  $('#tx-source').value = tx.source || 'manual';
+  $('#tx-form-title').classList.remove('hidden');
+  $('#tx-cancel-edit').classList.remove('hidden');
+  $('#tx-submit-btn').textContent = 'Änderung speichern';
+  $$('.tab').find((t) => t.dataset.tab === 'add')?.click();
+}
+
+$('#tx-cancel-edit')?.addEventListener('click', () => {
+  resetTxForm();
+  $$('.tab').find((t) => t.dataset.tab === 'home')?.click();
+});
 
 function fillFormFromParsed(p) {
   $(`input[name="type"][value="${p.type}"]`).checked = true;
@@ -290,18 +352,9 @@ function fillFormFromParsed(p) {
 
 function setupAddModes() {
   $$('.mode-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      $$('.mode-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      const mode = btn.dataset.mode;
-      $('#tx-form').classList.toggle('hidden', mode !== 'manual');
-      $('#voice-panel').classList.toggle('hidden', mode !== 'voice');
-      $('#receipt-panel').classList.toggle('hidden', mode !== 'receipt');
-      if (mode === 'manual') {
-        $('#tx-form').classList.remove('hidden');
-      }
-    });
+    btn.addEventListener('click', () => setAddMode(btn.dataset.mode));
   });
+  setAddMode('voice');
 }
 
 // --- Voice ---
@@ -334,17 +387,32 @@ function createWaveform(canvas, stream) {
     analyser.getByteFrequencyData(buffer);
 
     ctx.clearRect(0, 0, w, h);
-    const bars = 36;
-    const gap = 2;
+
+    const bars = 38;
+    const gap = 3;
     const barW = Math.max(2, (w - gap * (bars - 1)) / bars);
+    const center = (bars - 1) / 2;
+
+    let energy = 0;
+    for (let i = 0; i < buffer.length / 3; i += 1) energy += buffer[i];
+    const avg = energy / (buffer.length / 3) / 255;
 
     for (let i = 0; i < bars; i += 1) {
-      const idx = Math.floor((i / bars) * buffer.length);
-      const v = buffer[idx] / 255;
-      const barH = Math.max(3, v * h * 0.88);
+      const dist = Math.abs(i - center) / center;
+      const freqIdx = Math.min(
+        Math.floor(dist * dist * buffer.length * 0.4),
+        buffer.length - 1,
+      );
+      const v = buffer[freqIdx] / 255;
+      const centerWeight = 1 - dist * 0.55;
+      const amp = Math.min(1, v * centerWeight + avg * (1 - dist) * 0.4);
+      const barH = Math.max(3, amp * h * 0.92);
       const x = i * (barW + gap);
       const y = (h - barH) / 2;
-      ctx.fillStyle = v > 0.12 ? `rgba(255, 180, 162, ${0.45 + v * 0.55})` : 'rgba(255,255,255,0.12)';
+      const alpha = amp > 0.08 ? 0.45 + amp * 0.55 : 0.08 + avg * 0.12;
+      ctx.fillStyle = amp > 0.08
+        ? `rgba(232, 180, 168, ${alpha})`
+        : `rgba(255, 255, 255, ${0.06 + avg * 0.14})`;
       ctx.fillRect(x, y, barW, barH);
     }
     raf = requestAnimationFrame(draw);
@@ -440,7 +508,7 @@ function setupVoiceRecording() {
     try {
       const parsed = await api('/api/ai/parse-audio', { method: 'POST', body: fd });
       fillFormFromParsed(parsed);
-      $$('.mode-btn').find((b) => b.dataset.mode === 'manual')?.click();
+      setAddMode('manual');
       $('#tx-form').classList.remove('hidden');
     } catch (ex) {
       toast(ex.message);
@@ -537,7 +605,7 @@ function setupReceipt() {
       const parsed = await api('/api/ai/parse-receipt', { method: 'POST', body: fd });
       state.receiptPath = parsed.receipt_path;
       fillFormFromParsed(parsed);
-      $$('.mode-btn').find((b) => b.dataset.mode === 'manual')?.click();
+      setAddMode('manual');
       $('#tx-form').classList.remove('hidden');
     } catch (ex) {
       toast(ex.message);
@@ -585,8 +653,8 @@ function drawTrendChart(rows) {
 
   const months = [...new Set(rows.map((r) => r.month))].sort();
   if (!months.length) {
-    ctx.fillStyle = '#5c6b66';
-    ctx.font = '13px DM Sans, sans-serif';
+    ctx.fillStyle = '#6b7c77';
+    ctx.font = '13px Plus Jakarta Sans, sans-serif';
     ctx.fillText('Noch keine Daten', 12, h / 2);
     return;
   }
@@ -609,22 +677,22 @@ function drawTrendChart(rows) {
     const incH = (inc / max) * chartH;
     const baseY = pad.t + chartH;
 
-    ctx.fillStyle = '#9b2226';
+    ctx.fillStyle = '#b84a3a';
     ctx.fillRect(x, baseY - expH, barW / 2 - 1, expH);
-    ctx.fillStyle = '#2d6a4f';
+    ctx.fillStyle = '#2f6b57';
     ctx.fillRect(x + barW / 2 + 1, baseY - incH, barW / 2 - 1, incH);
 
-    ctx.fillStyle = '#5c6b66';
-    ctx.font = '10px DM Sans, sans-serif';
+    ctx.fillStyle = '#6b7c77';
+    ctx.font = '10px Plus Jakarta Sans, sans-serif';
     ctx.textAlign = 'center';
     const label = m.slice(5);
     ctx.fillText(label, x + barW / 2, h - 6);
   });
 
-  ctx.font = '10px DM Sans, sans-serif';
-  ctx.fillStyle = '#9b2226';
+  ctx.font = '10px Plus Jakarta Sans, sans-serif';
+  ctx.fillStyle = '#b84a3a';
   ctx.fillText('Ausgaben', pad.l, 10);
-  ctx.fillStyle = '#2d6a4f';
+  ctx.fillStyle = '#2f6b57';
   ctx.fillText('Einnahmen', pad.l + 58, 10);
 }
 

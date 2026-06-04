@@ -173,6 +173,24 @@ app.post('/api/transactions', requireAppAuth, requireUser, (req, res) => {
   }
 });
 
+app.put('/api/transactions/:id', requireAppAuth, requireUser, (req, res) => {
+  try {
+    const { type, amount, category, description, date } = req.body;
+    if (!['income', 'expense'].includes(type)) throw new Error('Ungültiger Typ');
+    const tx = db.updateTransaction(req.user.id, Number(req.params.id), {
+      type,
+      amount: Math.abs(Number(amount)),
+      category,
+      description,
+      date: date || new Date().toISOString().slice(0, 10),
+    });
+    if (!tx) return res.status(404).json({ error: 'Buchung nicht gefunden' });
+    res.json(tx);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.delete('/api/transactions/:id', requireAppAuth, requireUser, (req, res) => {
   db.deleteTransaction(req.user.id, Number(req.params.id));
   res.json({ ok: true });

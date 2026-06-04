@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <meta name="theme-color" content="#1a2421" />
+  <meta name="theme-color" content="#1c2b28" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Haushalt</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -96,13 +96,14 @@
 
       <!-- Add -->
       <div id="panel-add" class="panel">
-        <div class="add-modes">
-          <button type="button" class="mode-btn active" data-mode="manual">Manuell</button>
-          <button type="button" class="mode-btn" data-mode="voice">Sprache</button>
-          <button type="button" class="mode-btn" data-mode="receipt">Beleg</button>
+        <div class="add-modes segment" role="tablist" aria-label="Erfassungsart">
+          <button type="button" class="mode-btn segment-btn" data-mode="manual">Manuell</button>
+          <button type="button" class="mode-btn segment-btn active" data-mode="voice">Sprache</button>
+          <button type="button" class="mode-btn segment-btn" data-mode="receipt">Beleg</button>
         </div>
 
-        <form id="tx-form" class="tx-form">
+        <form id="tx-form" class="tx-form panel-card hidden">
+          <h3 id="tx-form-title" class="tx-form-title hidden">Buchung bearbeiten</h3>
           <div class="type-toggle" role="group" aria-label="Buchungstyp">
             <label><input type="radio" name="type" value="expense" checked /><span>Ausgabe</span></label>
             <label><input type="radio" name="type" value="income" /><span>Einnahme</span></label>
@@ -124,11 +125,12 @@
             <input type="date" id="tx-date" required />
           </div>
           <input type="hidden" id="tx-source" value="manual" />
-          <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+          <button type="submit" id="tx-submit-btn" class="btn btn-primary btn-block">Speichern</button>
+          <button type="button" id="tx-cancel-edit" class="btn btn-secondary btn-block hidden">Abbrechen</button>
         </form>
 
-        <div id="voice-panel" class="sub-panel hidden">
-          <p class="hint">Sag z.B. „15 Euro Kaffee beim Bäcker gestern“</p>
+        <div id="voice-panel" class="sub-panel panel-card">
+          <p class="hint panel-card-lead">Sag z.B. „15 Euro Kaffee beim Bäcker gestern“</p>
 
           <div class="recorder" id="audio-recorder">
             <div id="recorder-ui" class="recorder-state">
@@ -159,7 +161,7 @@
           </div>
         </div>
 
-        <div id="receipt-panel" class="sub-panel hidden">
+        <div id="receipt-panel" class="sub-panel panel-card hidden">
           <p class="hint">Beleg fotografieren – KI füllt Felder vor</p>
           <label class="receipt-upload">
             <input type="file" id="receipt-input" accept="image/*" capture="environment" />
