@@ -84,16 +84,18 @@
       <!-- Stats -->
       <div id="panel-stats" class="panel">
         <div class="stats-toolbar">
-          <div class="segment stats-scope" role="tablist" aria-label="Analyse-Ansicht">
-            <button type="button" class="segment-btn stats-scope-btn active" data-scope="personal">Du</button>
-            <button type="button" class="segment-btn stats-scope-btn" data-scope="family">Haushalt</button>
+          <div class="stats-scope-scroll">
+            <div class="segment stats-scope" id="stats-scope" role="tablist" aria-label="Analyse-Ansicht"></div>
           </div>
           <input type="month" id="stats-month" class="month-picker" aria-label="Monat wählen" />
         </div>
         <div id="stats-balance-summary" class="stats-balance-summary"></div>
         <div class="chart-block">
           <h3>Trend (6 Monate)</h3>
-          <canvas id="chart-trend" height="140"></canvas>
+          <div class="trend-wrap">
+            <canvas id="chart-trend"></canvas>
+            <div id="chart-trend-labels" class="trend-labels" aria-hidden="true"></div>
+          </div>
         </div>
         <div class="chart-block">
           <h3>Ausgaben nach Kategorie</h3>

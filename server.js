@@ -241,17 +241,27 @@ app.use('/uploads', requireAppAuth, express.static(uploadsDir));
 
 app.get('/api/stats/monthly', requireAppAuth, requireUser, (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7);
+  const users = db.listUsers();
   res.json({
-    personal: db.monthlyStats(req.user.id, month),
     family: db.monthlyStatsFamily(month),
+    users: users.map((u) => ({
+      userId: u.id,
+      name: u.name,
+      stats: db.monthlyStats(u.id, month),
+    })),
   });
 });
 
 app.get('/api/stats/trends', requireAppAuth, requireUser, (req, res) => {
   const months = Number(req.query.months) || 6;
+  const users = db.listUsers();
   res.json({
-    personal: db.trendStats(req.user.id, months),
     family: db.trendStatsFamily(months),
+    users: users.map((u) => ({
+      userId: u.id,
+      name: u.name,
+      rows: db.trendStats(u.id, months),
+    })),
   });
 });
 

@@ -4,7 +4,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const state = {
   user: null,
   editingId: null,
-  statsScope: 'personal',
+  statsScope: 'family',
   statsCache: null,
   receiptFile: null,
   receiptPath: null,
@@ -59,17 +59,19 @@ function fillBalanceCard(scope, stats) {
   card.querySelector('[data-expense]').textContent = `−${formatEuro(stats.expense)}`;
 }
 
-function renderStatsBalanceSummary(stats, scope) {
+function renderStatsBalanceSummary(stats, label) {
   const wrap = $('#stats-balance-summary');
-  const label = scope === 'family' ? 'Haushalt' : escapeHtml(state.user?.name || 'Du');
+  const scopeClass = state.statsScope === 'family' ? 'family' : 'personal';
   wrap.innerHTML = `
-    <div class="stats-balance-mini stats-balance-mini--${scope}">
-      <span class="balance-tag">${label}</span>
+    <div class="stats-balance-mini stats-balance-mini--${scopeClass}">
+      <span class="balance-tag">${escapeHtml(label)}</span>
       <div class="amount-md">${formatEuro(stats.balance)}</div>
       <div class="tx-meta">+${formatEuro(stats.income).replace('€', '').trim()} / −${formatEuro(stats.expense).replace('€', '').trim()} €</div>
     </div>
   `;
 }
+
+const EMPTY_STATS = { income: 0, expense: 0, balance: 0, byCategory: [], daily: [] };
 
 function formatDate(iso) {
   return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
@@ -135,6 +137,7 @@ async function boot() {
   state.user = status.user;
   $('#user-name').textContent = status.user.name;
   $('#personal-balance-tag').textContent = status.user.name;
+  state.statsScope = `user:${status.user.id}`;
   initApp();
   showScreen('app');
 }
@@ -154,6 +157,7 @@ async function loadUsers() {
       state.user = user;
       $('#user-name').textContent = user.name;
       $('#personal-balance-tag').textContent = user.name;
+      state.statsScope = `user:${user.id}`;
       initApp();
       showScreen('app');
     });
@@ -167,6 +171,7 @@ $('#new-user-form')?.addEventListener('submit', async (e) => {
     await api('/api/users', { method: 'POST', body: { name: input.value } });
     input.value = '';
     await loadUsers();
+    await buildStatsScopePicker();
     toast('Profil angelegt');
   } catch (ex) {
     toast(ex.message);
@@ -186,7 +191,7 @@ $$('.tab').forEach((tab) => {
     const name = tab.dataset.tab;
     $$('.panel').forEach((p) => p.classList.remove('active'));
     $(`#panel-${name}`)?.classList.add('active');
-    if (name === 'stats') drawStats();
+    if (name === 'stats') requestAnimationFrame(() => drawStats());
     if (name === 'home') loadHome();
     if (name === 'add') {
       if (state.editingId) setAddMode('manual');
@@ -221,6 +226,7 @@ async function initApp() {
   });
 
   setupStatsScope();
+  await buildStatsScopePicker();
 
   const cats = await api('/api/categories');
   const sel = $('#tx-category');
@@ -649,22 +655,47 @@ function setAiStatus(msg) {
 
 // --- Charts ---
 
+async function buildStatsScopePicker() {
+  const users = await api('/api/users');
+  const scopes = [
+    { id: 'family', label: 'Haushalt' },
+    ...users.map((u) => ({ id: `user:${u.id}`, label: u.name })),
+  ];
+  if (!scopes.some((s) => s.id === state.statsScope)) {
+    state.statsScope = state.user ? `user:${state.user.id}` : 'family';
+  }
+  const container = $('#stats-scope');
+  container.innerHTML = scopes.map((s) => `
+    <button type="button" class="segment-btn stats-scope-btn${s.id === state.statsScope ? ' active' : ''}" data-scope="${s.id}">${escapeHtml(s.label)}</button>
+  `).join('');
+}
+
+let statsScopeEventsBound = false;
+
 function setupStatsScope() {
-  $$('.stats-scope-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.statsScope = btn.dataset.scope;
-      $$('.stats-scope-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      drawStats();
-    });
+  if (statsScopeEventsBound) return;
+  statsScopeEventsBound = true;
+  $('#stats-scope')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.stats-scope-btn');
+    if (!btn) return;
+    state.statsScope = btn.dataset.scope;
+    $$('.stats-scope-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    drawStats();
   });
 }
 
-function statsMonthlyBlock(data) {
-  return state.statsScope === 'family' ? data.family : data.personal;
-}
-
-function statsTrendRows(data) {
-  return state.statsScope === 'family' ? data.family : data.personal;
+function getScopeData(cache) {
+  if (state.statsScope === 'family') {
+    return { stats: cache.monthly.family, trends: cache.trends.family, label: 'Haushalt' };
+  }
+  const userId = Number(String(state.statsScope).replace('user:', ''));
+  const u = cache.monthly.users.find((x) => x.userId === userId);
+  const t = cache.trends.users.find((x) => x.userId === userId);
+  return {
+    stats: u?.stats || EMPTY_STATS,
+    trends: t?.rows || [],
+    label: u?.name || '—',
+  };
 }
 
 async function drawStats() {
@@ -677,27 +708,30 @@ async function drawStats() {
     state.statsCache = { month, trends, monthly };
   }
 
-  const { trends, monthly } = state.statsCache;
-  const scopeStats = statsMonthlyBlock(monthly);
-  renderStatsBalanceSummary(scopeStats, state.statsScope);
-  drawTrendChart(statsTrendRows(trends));
-  drawCategoryBars(scopeStats.byCategory);
+  const { stats, trends, label } = getScopeData(state.statsCache);
+  renderStatsBalanceSummary(stats, label);
+  drawTrendChart(trends);
+  drawCategoryBars(stats.byCategory);
 }
 
 function drawTrendChart(rows) {
   const canvas = $('#chart-trend');
-  const block = canvas.parentElement;
+  const wrap = canvas.closest('.trend-wrap');
+  const labelsEl = $('#chart-trend-labels');
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const w = block.clientWidth;
-  const h = 140;
-  canvas.width = Math.max(1, Math.floor(w * dpr));
+  const w = Math.max(1, wrap.clientWidth);
+  const h = 120;
+  canvas.width = Math.floor(w * dpr);
   canvas.height = Math.floor(h * dpr);
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const months = [...new Set(rows.map((r) => r.month))].sort();
+  labelsEl.innerHTML = '';
+  labelsEl.style.gridTemplateColumns = '';
+
   if (!months.length) {
     ctx.fillStyle = '#6b7c77';
     ctx.font = '13px Plus Jakarta Sans, sans-serif';
@@ -706,18 +740,21 @@ function drawTrendChart(rows) {
     return;
   }
 
+  labelsEl.style.gridTemplateColumns = `repeat(${months.length}, 1fr)`;
+  labelsEl.innerHTML = months.map((m) => `<span class="trend-label">${m.slice(5)}</span>`).join('');
+
   const incomeByMonth = Object.fromEntries(rows.filter((r) => r.type === 'income').map((r) => [r.month, r.total]));
   const expenseByMonth = Object.fromEntries(rows.filter((r) => r.type === 'expense').map((r) => [r.month, r.total]));
   const max = Math.max(...months.map((m) => Math.max(incomeByMonth[m] || 0, expenseByMonth[m] || 0)), 1);
 
-  const pad = { l: 4, r: 4, t: 18, b: 24 };
-  const chartW = w - pad.l - pad.r;
+  const pad = { l: 0, r: 0, t: 16, b: 4 };
+  const chartW = w;
   const chartH = h - pad.t - pad.b;
   const slotW = chartW / months.length;
-  const barW = Math.max(4, slotW * 0.52);
+  const barW = Math.max(6, slotW * 0.48);
 
   months.forEach((m, i) => {
-    const slotCenter = pad.l + slotW * i + slotW / 2;
+    const slotCenter = slotW * i + slotW / 2;
     const x = slotCenter - barW / 2;
     const exp = expenseByMonth[m] || 0;
     const inc = incomeByMonth[m] || 0;
@@ -730,19 +767,14 @@ function drawTrendChart(rows) {
     ctx.fillRect(x, baseY - expH, half, expH);
     ctx.fillStyle = '#2f6b57';
     ctx.fillRect(x + half + 2, baseY - incH, half, incH);
-
-    ctx.fillStyle = '#6b7c77';
-    ctx.font = '10px Plus Jakarta Sans, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(m.slice(5), slotCenter, h - 8);
   });
 
   ctx.textAlign = 'left';
   ctx.font = '10px Plus Jakarta Sans, sans-serif';
   ctx.fillStyle = '#b84a3a';
-  ctx.fillText('Ausgaben', pad.l, 11);
+  ctx.fillText('Ausgaben', 0, 11);
   ctx.fillStyle = '#2f6b57';
-  ctx.fillText('Einnahmen', pad.l + 58, 11);
+  ctx.fillText('Einnahmen', 58, 11);
 }
 
 function drawCategoryBars(categories) {
@@ -752,17 +784,15 @@ function drawCategoryBars(categories) {
     return;
   }
   const max = Math.max(...categories.map((c) => c.total));
-  wrap.innerHTML = categories.map((c) => `
-    <div class="cat-row">
-      <div class="cat-row-head">
-        <span class="cat-label">${escapeHtml(c.category || 'Sonstiges')}</span>
-        <span class="cat-amount">${formatEuro(c.total)}</span>
-      </div>
-      <div class="cat-bar-wrap">
-        <div class="cat-bar" style="width:${(c.total / max) * 100}%"></div>
-      </div>
-    </div>
-  `).join('');
+  wrap.innerHTML = categories.map((c) => {
+    const pct = Math.round((c.total / max) * 100);
+    return `
+    <div class="cat-item">
+      <span class="cat-label" title="${escapeHtml(c.category || 'Sonstiges')}">${escapeHtml(c.category || 'Sonstiges')}</span>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%"></div></div>
+      <span class="cat-amount">${formatEuro(c.total)}</span>
+    </div>`;
+  }).join('');
 }
 
 boot().catch(() => showScreen('login'));
