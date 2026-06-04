@@ -84,10 +84,8 @@
       <!-- Stats -->
       <div id="panel-stats" class="panel">
         <div class="stats-toolbar">
-          <div class="stats-scope-scroll">
-            <div class="segment stats-scope" id="stats-scope" role="tablist" aria-label="Analyse-Ansicht"></div>
-          </div>
-          <input type="month" id="stats-month" class="month-picker" aria-label="Monat wählen" />
+          <select id="stats-scope" class="stats-control" aria-label="Analyse-Ansicht"></select>
+          <input type="month" id="stats-month" class="stats-control month-picker" aria-label="Monat wählen" />
         </div>
         <div id="stats-balance-summary" class="stats-balance-summary"></div>
         <div class="chart-block">

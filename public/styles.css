@@ -448,35 +448,19 @@ textarea:focus {
 
 /* Stats */
 .stats-toolbar {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.55rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
   margin-bottom: 0.85rem;
 }
 
-.stats-scope-scroll {
+.stats-control {
   width: 100%;
-  overflow: visible;
-}
-
-.stats-scope {
-  display: flex;
-  flex-wrap: wrap;
-  width: 100%;
-  gap: 0.35rem;
-  margin-bottom: 0;
-}
-
-.stats-scope .segment-btn {
-  flex: 1 1 calc(50% - 0.35rem);
-  min-width: 5.5rem;
-  white-space: nowrap;
-  padding: 0.5rem 0.65rem;
-}
-
-.stats-toolbar .month-picker {
-  align-self: flex-end;
+  min-width: 0;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .stats-balance-summary {

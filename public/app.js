@@ -672,12 +672,12 @@ async function buildStatsScopePicker() {
   if (!scopes.some((s) => s.id === state.statsScope)) {
     state.statsScope = state.user ? `user:${state.user.id}` : 'family';
   }
-  const container = $('#stats-scope');
-  if (!container) return;
-  container.innerHTML = scopes.map((s) => `
-    <button type="button" class="segment-btn stats-scope-btn${s.id === state.statsScope ? ' active' : ''}" data-scope="${s.id}">${escapeHtml(s.label)}</button>
+  const sel = $('#stats-scope');
+  if (!sel) return;
+  sel.innerHTML = scopes.map((s) => `
+    <option value="${escapeHtml(s.id)}"${s.id === state.statsScope ? ' selected' : ''}>${escapeHtml(s.label)}</option>
   `).join('');
-  container.setAttribute('aria-label', `Analyse-Ansicht: ${scopes.map((s) => s.label).join(', ')}`);
+  sel.value = state.statsScope;
 }
 
 let statsScopeEventsBound = false;
@@ -685,11 +685,8 @@ let statsScopeEventsBound = false;
 function setupStatsScope() {
   if (statsScopeEventsBound) return;
   statsScopeEventsBound = true;
-  $('#stats-scope')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.stats-scope-btn');
-    if (!btn) return;
-    state.statsScope = btn.dataset.scope;
-    $$('.stats-scope-btn').forEach((b) => b.classList.toggle('active', b === btn));
+  $('#stats-scope')?.addEventListener('change', (e) => {
+    state.statsScope = e.target.value;
     drawStats();
   });
 }
