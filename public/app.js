@@ -138,7 +138,7 @@ async function boot() {
   $('#user-name').textContent = status.user.name;
   $('#personal-balance-tag').textContent = status.user.name;
   state.statsScope = `user:${status.user.id}`;
-  initApp();
+  await initApp();
   showScreen('app');
 }
 
@@ -158,7 +158,7 @@ async function loadUsers() {
       $('#user-name').textContent = user.name;
       $('#personal-balance-tag').textContent = user.name;
       state.statsScope = `user:${user.id}`;
-      initApp();
+      await initApp();
       showScreen('app');
     });
   });
@@ -191,7 +191,9 @@ $$('.tab').forEach((tab) => {
     const name = tab.dataset.tab;
     $$('.panel').forEach((p) => p.classList.remove('active'));
     $(`#panel-${name}`)?.classList.add('active');
-    if (name === 'stats') requestAnimationFrame(() => drawStats());
+    if (name === 'stats') {
+      buildStatsScopePicker().then(() => requestAnimationFrame(() => drawStats()));
+    }
     if (name === 'home') loadHome();
     if (name === 'add') {
       if (state.editingId) setAddMode('manual');
@@ -212,46 +214,52 @@ function setAddMode(mode) {
 
 // --- Categories & form ---
 
+let appInitialized = false;
+
 async function initApp() {
-  const month = new Date().toISOString().slice(0, 7);
-  syncMonthPickers(month);
-  $('#filter-month').addEventListener('change', (e) => {
-    syncMonthPickers(e.target.value);
-    loadHome();
-  });
-  $('#stats-month').addEventListener('change', (e) => {
-    syncMonthPickers(e.target.value);
-    if ($('#panel-stats').classList.contains('active')) drawStats();
-    else loadHome();
-  });
+  if (!appInitialized) {
+    appInitialized = true;
+    const month = new Date().toISOString().slice(0, 7);
+    syncMonthPickers(month);
+    $('#filter-month').addEventListener('change', (e) => {
+      syncMonthPickers(e.target.value);
+      loadHome();
+    });
+    $('#stats-month').addEventListener('change', (e) => {
+      syncMonthPickers(e.target.value);
+      if ($('#panel-stats').classList.contains('active')) drawStats();
+      else loadHome();
+    });
 
-  setupStatsScope();
+    setupStatsScope();
+
+    const cats = await api('/api/categories');
+    const sel = $('#tx-category');
+    sel.innerHTML = cats.map((c) => `<option value="${c}">${c}</option>`).join('');
+
+    $('#tx-date').value = new Date().toISOString().slice(0, 10);
+
+    $('#tx-form').addEventListener('submit', onSaveTx);
+    setupAddModes();
+    setupVoice();
+    setupReceipt();
+  }
+
   await buildStatsScopePicker();
-
-  const cats = await api('/api/categories');
-  const sel = $('#tx-category');
-  sel.innerHTML = cats.map((c) => `<option value="${c}">${c}</option>`).join('');
-
-  $('#tx-date').value = new Date().toISOString().slice(0, 10);
-
-  $('#tx-form').addEventListener('submit', onSaveTx);
-  setupAddModes();
-  setupVoice();
-  setupReceipt();
-
   loadHome();
 }
 
 async function loadHome() {
   const month = currentMonth();
-  const [{ personal, family }, txs] = await Promise.all([
+  const [monthly, txs] = await Promise.all([
     api(`/api/stats/monthly?month=${month}`),
     api(`/api/transactions?month=${month}&limit=100`),
   ]);
+  const personal = monthly.users?.find((u) => u.userId === state.user?.id)?.stats || EMPTY_STATS;
 
   $('#month-label').textContent = `Buchungen · ${monthLabel(month)}`;
   if (state.user?.name) $('#personal-balance-tag').textContent = state.user.name;
-  fillBalanceCard('family', family);
+  fillBalanceCard('family', monthly.family);
   fillBalanceCard('personal', personal);
 
   const list = $('#tx-list');
@@ -665,9 +673,11 @@ async function buildStatsScopePicker() {
     state.statsScope = state.user ? `user:${state.user.id}` : 'family';
   }
   const container = $('#stats-scope');
+  if (!container) return;
   container.innerHTML = scopes.map((s) => `
     <button type="button" class="segment-btn stats-scope-btn${s.id === state.statsScope ? ' active' : ''}" data-scope="${s.id}">${escapeHtml(s.label)}</button>
   `).join('');
+  container.setAttribute('aria-label', `Analyse-Ansicht: ${scopes.map((s) => s.label).join(', ')}`);
 }
 
 let statsScopeEventsBound = false;
