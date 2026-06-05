@@ -202,7 +202,7 @@ app.post('/api/ai/parse-text', requireAppAuth, requireUser, async (req, res) => 
   try {
     const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'Text fehlt' });
-    const parsed = await gemini.parseNaturalLanguage(text.trim());
+    const parsed = await gemini.parseNaturalLanguage(text.trim(), db.getCategories());
     res.json(parsed);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -212,7 +212,7 @@ app.post('/api/ai/parse-text', requireAppAuth, requireUser, async (req, res) => 
 app.post('/api/ai/parse-audio', requireAppAuth, requireUser, uploadAudio.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Keine Audio-Datei' });
   try {
-    const parsed = await gemini.parseAudio(req.file.path, req.file.mimetype);
+    const parsed = await gemini.parseAudio(req.file.path, req.file.mimetype, db.getCategories());
     fs.unlinkSync(req.file.path);
     res.json(parsed);
   } catch (e) {
@@ -224,7 +224,7 @@ app.post('/api/ai/parse-audio', requireAppAuth, requireUser, uploadAudio.single(
 app.post('/api/ai/parse-receipt', requireAppAuth, requireUser, upload.single('receipt'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Kein Bild' });
   try {
-    const parsed = await gemini.parseReceiptImage(req.file.path, req.file.mimetype);
+    const parsed = await gemini.parseReceiptImage(req.file.path, req.file.mimetype, db.getCategories());
     const ext = path.extname(req.file.originalname) || '.jpg';
     const dest = path.join(uploadsDir, `${req.user.id}-${Date.now()}${ext}`);
     fs.renameSync(req.file.path, dest);
@@ -267,6 +267,15 @@ app.get('/api/stats/trends', requireAppAuth, requireUser, (req, res) => {
 
 app.get('/api/categories', requireAppAuth, (_req, res) => {
   res.json(db.getCategories());
+});
+
+app.post('/api/categories', requireAppAuth, (req, res) => {
+  try {
+    const category = db.createCategory(req.body.name);
+    res.status(201).json(category);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.get('*', (_req, res) => {

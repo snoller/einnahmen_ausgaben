@@ -233,13 +233,11 @@ async function initApp() {
 
     setupStatsScope();
 
-    const cats = await api('/api/categories');
-    const sel = $('#tx-category');
-    sel.innerHTML = cats.map((c) => `<option value="${c}">${c}</option>`).join('');
-
+    await loadCategories();
     $('#tx-date').value = new Date().toISOString().slice(0, 10);
 
     $('#tx-form').addEventListener('submit', onSaveTx);
+    $('#new-category-form')?.addEventListener('submit', onAddCategory);
     setupAddModes();
     setupVoice();
     setupReceipt();
@@ -247,6 +245,31 @@ async function initApp() {
 
   await buildStatsScopePicker();
   loadHome();
+}
+
+async function loadCategories(selected) {
+  const cats = await api('/api/categories');
+  const sel = $('#tx-category');
+  if (!sel) return;
+  sel.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if (selected && [...sel.options].some((o) => o.value === selected)) {
+    sel.value = selected;
+  }
+}
+
+async function onAddCategory(e) {
+  e.preventDefault();
+  const input = $('#new-category-name');
+  const name = input.value.trim();
+  if (!name) return;
+  try {
+    await api('/api/categories', { method: 'POST', body: { name } });
+    input.value = '';
+    await loadCategories(name);
+    toast('Kategorie angelegt');
+  } catch (ex) {
+    toast(ex.message);
+  }
 }
 
 async function loadHome() {

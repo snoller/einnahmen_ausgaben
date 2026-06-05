@@ -649,6 +649,17 @@ textarea:focus {
 
 .tx-form .field { margin-bottom: 0.8rem; }
 
+.category-add-form {
+  margin-top: 0.45rem;
+}
+
+.category-add-form .btn {
+  min-width: 2.75rem;
+  padding: 0 0.65rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 .type-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
