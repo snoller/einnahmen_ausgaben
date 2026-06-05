@@ -110,7 +110,7 @@ label {
 }
 
 /* Forms */
-input:not([type="radio"]):not([type="checkbox"]),
+input:not([type="radio"]):not([type="checkbox"]):not([type="date"]):not([type="month"]),
 select,
 textarea {
   width: 100%;
@@ -124,7 +124,43 @@ textarea {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-input:not([type="radio"]):not([type="checkbox"]):focus,
+input[type="date"],
+input[type="month"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="month"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="month"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+  min-width: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+  margin: 0;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+input:not([type="radio"]):not([type="checkbox"]):not([type="date"]):not([type="month"]):focus,
+input[type="date"]:focus,
+input[type="month"]:focus,
 select:focus,
 textarea:focus {
   outline: none;
@@ -438,11 +474,13 @@ textarea:focus {
   text-overflow: ellipsis;
 }
 
-.month-picker {
+input[type="month"].month-picker {
   width: auto;
+  max-width: 10rem;
+  flex: 0 1 auto;
   font-size: 0.82rem;
   padding: 0.45rem 0.55rem;
-  border-radius: var(--radius-sm);
+  min-height: 2.35rem;
   background: var(--surface);
 }
 
@@ -489,11 +527,16 @@ textarea:focus {
 .stats-toolbar input[type="month"].stats-control {
   appearance: none;
   -webkit-appearance: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stats-toolbar input[type="month"].stats-control::-webkit-datetime-edit,
 .stats-toolbar input[type="month"].stats-control::-webkit-datetime-edit-fields-wrapper {
   padding: 0;
+  min-width: 0;
 }
 
 .stats-toolbar input[type="month"].stats-control::-webkit-calendar-picker-indicator {
@@ -649,15 +692,103 @@ textarea:focus {
 
 .tx-form .field { margin-bottom: 0.8rem; }
 
-.category-add-form {
-  margin-top: 0.45rem;
+.tx-form.panel-card {
+  padding-bottom: 1.6rem;
+  margin-bottom: 0.5rem;
 }
 
-.category-add-form .btn {
-  min-width: 2.75rem;
-  padding: 0 0.65rem;
-  font-size: 1.1rem;
+.category-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.category-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-icon-add {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
   line-height: 1;
+  background: var(--bg-accent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-icon-add:active {
+  transform: scale(0.96);
+}
+
+.btn-icon-add:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 69, 65, 0.12);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 43, 40, 0.38);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  position: relative;
+  width: min(100%, 22rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.modal-card h3 {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.modal-card .field {
+  margin-bottom: 0;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.modal-actions .btn {
+  width: auto;
+  margin-top: 0;
 }
 
 .type-toggle {

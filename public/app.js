@@ -237,7 +237,7 @@ async function initApp() {
     $('#tx-date').value = new Date().toISOString().slice(0, 10);
 
     $('#tx-form').addEventListener('submit', onSaveTx);
-    $('#new-category-form')?.addEventListener('submit', onAddCategory);
+    setupCategoryModal();
     setupAddModes();
     setupVoice();
     setupReceipt();
@@ -266,10 +266,41 @@ async function onAddCategory(e) {
     await api('/api/categories', { method: 'POST', body: { name } });
     input.value = '';
     await loadCategories(name);
+    closeCategoryModal();
     toast('Kategorie angelegt');
   } catch (ex) {
     toast(ex.message);
   }
+}
+
+let categoryModalBound = false;
+
+function openCategoryModal() {
+  const modal = $('#category-modal');
+  modal?.classList.remove('hidden');
+  const input = $('#new-category-name');
+  if (input) {
+    input.value = '';
+    requestAnimationFrame(() => input.focus());
+  }
+}
+
+function closeCategoryModal() {
+  $('#category-modal')?.classList.add('hidden');
+}
+
+function setupCategoryModal() {
+  if (categoryModalBound) return;
+  categoryModalBound = true;
+  $('#btn-add-category')?.addEventListener('click', openCategoryModal);
+  $('#category-modal-cancel')?.addEventListener('click', closeCategoryModal);
+  $('#category-modal')?.querySelector('.modal-backdrop')?.addEventListener('click', closeCategoryModal);
+  $('#new-category-form')?.addEventListener('submit', onAddCategory);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#category-modal')?.classList.contains('hidden')) {
+      closeCategoryModal();
+    }
+  });
 }
 
 async function loadHome() {
